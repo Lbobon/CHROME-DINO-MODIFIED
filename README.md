@@ -17,6 +17,17 @@ This is a modified version of the classic Chrome Dino game with some exciting ne
 
 Try to survive as long as possible!
 
+### 📸 Demo Screenshots
+
+#### Gravity Flipping Demo
+![Gravity Flipping Demo](DEMO/gravity%20flipping%20DEMO.png)
+
+#### Devil World Mode
+![Devil World Mode](DEMO/Devil%20world.png)
+
+#### Orbs Demo
+![Orbs Demo](DEMO/orbs%20DEMO.png)
+
 ### 🚀 Play Now
 Simply open `DINO GAME.html` in your browser to start playing!
 
