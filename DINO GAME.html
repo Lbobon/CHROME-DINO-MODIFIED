@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reverse Dino Run</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #f7f7f7;
+      font-family: 'Courier New', monospace;
+      color: #535353;
+    }
+    #gameContainer {
+      position: relative;
+      width: 720px;
+      height: 240px;
+      background: #f7f7f7;
+      overflow: hidden;
+      border-bottom: 2px solid #535353;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    #gameCanvas {
+      display: block;
+      transition: transform 0.4s ease, filter 0.4s ease;
+      will-change: transform, filter;
+    }
+    #scoreContainer {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 5;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: #525252;
+      font-weight: bold;
+    }
+    #gravityTimer {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #535353;
+      font-size: 11px;
+      letter-spacing: 1px;
+      background: rgba(255,255,255,0.8);
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: all 0.3s ease;
+    }
+    #devilTimer {
+      position: absolute;
+      top: 10px;
+      left: 140px;
+      color: #7a0b0b;
+      font-size: 11px;
+      letter-spacing: 1px;
+      background: rgba(255, 230, 230, 0.85);
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid rgba(150,0,0,0.5);
+      display: none;
+    }
+    #gravityTimer.flipped {
+      background: rgba(200,150,255,0.9);
+      color: #4a0e4a;
+      border: 1px solid #8a4fca;
+    }
+    .warning {
+      color: #ff0000 !important;
+      background: rgba(255,0,0,0.1) !important;
+      animation: blink 0.5s infinite;
+      border: 1px solid #ff0000;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+    #startScreen, #gameOverScreen {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      background: rgba(247,247,247,0.95);
+      z-index: 10;
+      backdrop-filter: blur(2px);
+    }
+    #gameOverScreen {
+      display: none;
+    }
+    #instructions {
+        position: absolute;
+        bottom: 15px;
+        width: 100%;
+        text-align: center;
+        font-size: 10px;
+        color: #8e8e8e;
+        animation: pulse 2s infinite;
+        line-height: 1.4;
+    }
+    #instructions small {
+        font-size: 8px;
+        color: #aaa;
+    }
+    #leaderboardButton {
+      position: absolute;
+      top: 260px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #535353;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      cursor: pointer;
+      z-index: 5;
+    }
+    #leaderboardButton:hover {
+      background: #404040;
+    }
+    /* Ink/Squid overlay effect */
+    #inkOverlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      display: none;
+      z-index: 9; /* above HUD, below modals */
+      opacity: 0;
+      transition: opacity 300ms ease;
+      backdrop-filter: none;
+    }
+    #inkOverlay.active { display: block; }
+    .ink-splat {
+      position: absolute;
+      width: 30px; height: 30px;
+      border-radius: 58% 42% 66% 34% / 49% 62% 38% 51%;
+      background: rgba(0,0,0,0.92);
+      box-shadow: 0 0 2px rgba(0,0,0,0.9), 0 0 12px rgba(0,0,0,0.5);
+      transform: scale(0);
+      animation: splat-pop 800ms ease forwards;
+      filter: drop-shadow(0 3px 2px rgba(0,0,0,0.35));
+    }
+    .ink-dot { position: absolute; background: rgba(0,0,0,0.95); border-radius: 50%; }
+    @keyframes splat-pop {
+      0% { transform: scale(0) rotate(0deg); opacity: 0; }
+      60% { transform: scale(1.2) rotate(8deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    #leaderboardModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 30;
+    }
+    #leaderboardContent {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      min-width: 300px;
+      max-width: 400px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    #leaderboardContent h3 {
+      margin: 0 0 15px 0;
+      text-align: center;
+      color: #333;
+    }
+    .leaderboard-entry {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+      padding: 5px;
+      border-radius: 3px;
+    }
+    .leaderboard-entry.current-user {
+      background: rgba(255, 215, 0, 0.3);
+      font-weight: bold;
+    }
+    #closeLeaderboard {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+    }
+    #closeLeaderboard:hover {
+      color: #333;
+    }
+    #nameInput {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.95);
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px solid #535353;
+      text-align: center;
+      z-index: 20;
+      display: none;
+    }
+    #nameInput input {
+      padding: 5px;
+      margin: 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-family: inherit;
+    }
+    #nameInput button {
+      padding: 8px 15px;
+      background: #535353;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #nameInput button:hover {
+      background: #404040;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+      20%, 40%, 60%, 80% { transform: translateX(2px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="720" height="240"></canvas>
+    <div id="inkOverlay"></div>
+    <div id="scoreContainer">
+      <span id="highScore">HI 0</span>
+      <span id="score">0</span>
+    </div>
+    <div id="gravityTimer">GRAVITY FLIP: 20s</div>
+    <div id="devilTimer">DEVIL WORLD: 10s</div>
+    <div id="startScreen">
+      <div id="instructions">PRESS SPACE OR CLICK TO START<br><small>Space/Click to jump • Down arrow to duck • Gravity flips every 8 seconds</small></div>
+    </div>
+    <div id="gameOverScreen">
+      <!-- Game Over elements will be drawn on canvas -->
+    </div>
+    <button id="leaderboardButton" onclick="showLeaderboard()">🏆 Leaderboard</button>
+    <div id="nameInput">
+      <h3>🎉 NEW HIGH SCORE!</h3>
+      <p>Enter your name:</p>
+      <input type="text" id="playerName" maxlength="12" placeholder="Your name">
+      <br>
+      <button onclick="submitScore()">Submit Score</button>
+    </div>
+  </div>
+  <div id="leaderboardModal">
+    <div id="leaderboardContent">
+      <button id="closeLeaderboard" onclick="hideLeaderboard()">&times;</button>
+      <h3>🏆 LEADERBOARD</h3>
+      <div id="leaderboardList"></div>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('gameContainer');
+    const inkOverlay = document.getElementById('inkOverlay');
+    const devilTimerEl = document.getElementById('devilTimer');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('highScore');
+    const gravityTimerEl = document.getElementById('gravityTimer');
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const leaderboardListEl = document.getElementById('leaderboardList');
+    const leaderboardModal = document.getElementById('leaderboardModal');
+    const nameInputEl = document.getElementById('nameInput');
+    const playerNameInput = document.getElementById('playerName');
+const groundYPosition = 215;
+const ceilingYPosition = 25;
+
+const sprite = new Image();
+sprite.src = 'https://chromedino.com/assets/offline-sprite-1x.png';
+
+// --- Game State ---
+let gameRunning = false;
+let gameOverState = false;
+let score = 0;
+let highScore = localStorage.getItem('dinoHighScore') || 0;
+let gravityFlipped = false;
+let gravityTimer = 8;
+let lastFlipTime = 0;
+let gameSpeed = 2.5;
+let frame = 0;
+
+// --- Leaderboard System ---
+let currentPlayerName = localStorage.getItem('playerName') || '';
+let waitingForNameInput = false;
+
+// --- Gravity Flip Transition ---
+let isTransitioning = false;
+let transitionStartTime = 0;
+const TRANSITION_DURATION = 1500; // 1.5 seconds
+let transitionPhase = 0; // 0-1 progress
+let mapDeformation = 0;
+let dinoLevitationHeight = 0;
+
+// --- Game Objects ---
+const dino = { 
+  x: 50, y: 0, width: 44, height: 47, velocityY: 0, jumpPower: 8, gravity: 0.3, onGround: false,
+  isDucking: false, normalWidth: 44, normalHeight: 47, duckWidth: 59, duckHeight: 30
+};
+let obstacles = [];
+let clouds = [];
+let groundX = 0;
+
+// --- Ink Effect State ---
+let inkEffectActive = false;
+let inkEffectEndTime = 0;
+let inkHalfClass = '';
+const INK_EFFECT_DURATION_MS = 4500;
+let lastInkPulse = 0;
+
+// --- Devil World State ---
+let devilWorldActive = false;
+let devilWorldEndTime = 0;
+const DEVIL_WORLD_DURATION_MS = 10000; // 10 seconds
+let nextPortalFrame = 400; // first portal spawn window
+let devilFogPhase = 0;
+let embers = [];
+let savedSpeedBeforeDevil = 2.5;
+let nextDevilSkullFrame = 0;
+
+// --- Sprite Coordinates (1x) ---
+const SPRITES = {
+  DINO_RUN1: { x: 848, y: 2, w: 44, h: 47 },
+  DINO_RUN2: { x: 892, y: 2, w: 44, h: 47 },
+  DINO_JUMP: { x: 676, y: 2, w: 44, h: 47 },
+  DINO_IDLE: { x: 40, y: 2, w: 44, h: 47 },
+  CLOUD: { x: 86, y: 2, w: 46, h: 13 },
+  GROUND: { x: 2, y: 54, w: 1200, h: 12 },
+  RESTART_BTN: { x: 2, y: 2, w: 36, h: 32 },
+  GAME_OVER_TEXT: { x: 655, y: 14, w: 191, h: 11 },
+  CACTI: [
+    { x: 228, y: 2, w: 17, h: 35 }, // Small 1
+    { x: 245, y: 2, w: 34, h: 35 }, // Small 2
+    { x: 279, y: 2, w: 51, h: 35 }, // Small 3
+    { x: 332, y: 2, w: 25, h: 50 }, // Large 1
+    { x: 357, y: 2, w: 50, h: 50 }, // Large 2
+    { x: 407, y: 2, w: 75, h: 50 }, // Large 3
+  ],
+  BIRDS: [
+    { x: 134, y: 2, w: 46, h: 40 }, // Bird 1
+    { x: 180, y: 2, w: 46, h: 40 }, // Bird 2
+  ],
+  DINO_DUCK1: { x: 1112, y: 2, w: 59, h: 30 }, // Ducking 1
+  DINO_DUCK2: { x: 1171, y: 2, w: 59, h: 30 }  // Ducking 2
+};
+
+function getGroundLevel() {
+  const height = dino.isDucking ? dino.duckHeight : dino.height;
+  return gravityFlipped ? ceilingYPosition : groundYPosition - height;
+}
+
+function resetDino() {
+  dino.isDucking = false;
+  dino.width = dino.normalWidth;
+  dino.height = dino.normalHeight;
+  dino.y = getGroundLevel();
+  dino.velocityY = 0;
+  dino.onGround = true;
+}
+
+sprite.onload = () => {
+  highScoreEl.textContent = `HI ${String(Math.floor(highScore)).padStart(5, '0')}`;
+  scoreEl.textContent = String(Math.floor(score)).padStart(5, '0');
+  resetDino();
+  drawIdleState();
+};
+
+function drawIdleState() {
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    drawGround();
+    drawCeiling();
+    // Draw idle dino
+    ctx.drawImage(
+      sprite,
+      SPRITES.DINO_IDLE.x, SPRITES.DINO_IDLE.y,
+      SPRITES.DINO_IDLE.w, SPRITES.DINO_IDLE.h,
+      dino.x, dino.y,
+      dino.width, dino.height
+    );
+}
+
+class Obstacle {
+  constructor() {
+    // Determine obstacle type with weighted probability (cactus, bird, orb)
+    const rand = Math.random();
+    this.type = 'cactus'; // default
+
+    if (rand < 0.62) {
+      // 62% cacti
+      const useSmall = Math.random() < 0.7;
+      const obstaclePool = useSmall ? SPRITES.CACTI.slice(0, 3) : SPRITES.CACTI.slice(3);
+      const selectedSprite = obstaclePool[Math.floor(Math.random() * obstaclePool.length)];
+      this.sprite = selectedSprite;
+      this.width = selectedSprite.w;
+      this.height = selectedSprite.h;
+      this.type = 'cactus';
+    } else if (rand < 0.87) {
+      // 25% birds
+      const selectedSprite = SPRITES.BIRDS[Math.floor(Math.random() * SPRITES.BIRDS.length)];
+      this.sprite = selectedSprite;
+      this.width = selectedSprite.w;
+      this.height = selectedSprite.h;
+      this.type = 'bird';
+    } else {
+      // 13% orb (special visual hazard, non-lethal)
+      this.type = 'orb';
+      const radius = 11 + Math.floor(Math.random() * 7);
+      this.radius = radius;
+      this.width = radius * 2 + 6; // include glow
+      this.height = radius * 2 + 6;
+    }
+
+    this.x = canvas.width;
+    this.isFlipped = gravityFlipped;
+
+    // Set Y position based on obstacle type
+    if (this.type === 'bird') {
+      // Birds fly at different heights
+      const birdHeights = gravityFlipped ?
+        [ceilingYPosition + 20, ceilingYPosition + 40] :
+        [groundYPosition - this.height - 40, groundYPosition - this.height - 20];
+      this.y = birdHeights[Math.floor(Math.random() * birdHeights.length)];
+    } else if (this.type === 'orb') {
+      // Orbs float mid-lane and sometimes inverted when gravity is flipped
+      const lanes = gravityFlipped ?
+        [ceilingYPosition + 28, ceilingYPosition + 56, ceilingYPosition + 84] :
+        [groundYPosition - this.height - 70, groundYPosition - this.height - 45, groundYPosition - this.height - 20];
+      this.baseY = lanes[Math.floor(Math.random() * lanes.length)];
+      this.y = this.baseY;
+      this.bobPhase = Math.random() * Math.PI * 2;
+      this.hue = 250 + Math.random() * 60; // purple range
+    } else {
+      // Ground-based obstacles
+      this.y = this.isFlipped ? ceilingYPosition : groundYPosition - this.height;
+    }
+
+    this.passed = false;
+    this.frame = 0; // For animations
+  }
+  update() { 
+    this.x -= gameSpeed; 
+    this.frame++; // For animations
+    if (this.type === 'orb') {
+      // gentle bobbing
+      const amplitude = 6;
+      const speed = 0.06;
+      this.bobPhase += speed;
+      this.y = this.baseY + Math.sin(this.bobPhase) * amplitude * (this.isFlipped ? -1 : 1);
+    }
+  }
+  draw() {
+    if (this.type === 'orb') {
+      // Draw glowing orb with ring and flicker
+      const r = this.radius;
+      const cx = this.x + r + 3;
+      const cy = this.y + r + 3;
+      const pulse = 0.7 + 0.3 * Math.sin(this.frame * 0.25);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowColor = `hsl(${this.hue}, 90%, 60%)`;
+      ctx.shadowBlur = 16 * pulse;
+
+      // core
+      const g = ctx.createRadialGradient(cx, cy, 2, cx, cy, r);
+      g.addColorStop(0, `hsla(${this.hue},100%,80%,0.95)`);
+      g.addColorStop(0.6, `hsla(${this.hue},100%,55%,0.8)`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // orbiting ring
+      ctx.shadowBlur = 8 * pulse;
+      ctx.strokeStyle = `hsla(${this.hue + 30}, 90%, 70%, ${0.7 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r + 6, r + 2, (this.frame * 0.12) % (Math.PI * 2), 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Add subtle shadow effect for ground-based obstacles
+    if (!this.isFlipped && this.type !== 'bird') {
+      ctx.fillStyle = 'rgba(83, 83, 83, 0.3)';
+      ctx.fillRect(this.x + 2, this.y + this.height - 2, this.width, 3);
+    }
+
+    let spriteToUse = this.sprite;
+
+    // Animate birds with flapping wings
+    if (this.type === 'bird') {
+      const birdFrame = Math.floor(this.frame / 10) % 2;
+      spriteToUse = SPRITES.BIRDS[birdFrame];
+    }
+
+    if (this.isFlipped && this.type !== 'bird') {
+      // Only rotate ground obstacles when flipped, birds stay upright
+      ctx.save();
+      ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+      ctx.rotate(Math.PI);
+      ctx.drawImage(sprite, spriteToUse.x, spriteToUse.y, this.width, this.height, -this.width / 2, -this.height / 2, this.width, this.height);
+      ctx.restore();
+    } else {
+      // Birds and normal obstacles
+      if (this.type === 'bird' && this.isFlipped) {
+        // Flip birds vertically when gravity is flipped
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.scale(1, -1);
+        ctx.drawImage(sprite, spriteToUse.x, spriteToUse.y, this.width, this.height, -this.width / 2, -this.height / 2, this.width, this.height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(sprite, spriteToUse.x, spriteToUse.y, this.width, this.height, this.x, this.y, this.width, this.height);
+      }
+    }
+  }
+}
+
+class Cloud {
+    constructor() {
+        this.x = canvas.width;
+        this.y = 40 + Math.random() * 120;
+        this.opacity = 0.6 + Math.random() * 0.4;
+    }
+    update() { this.x -= gameSpeed / 5; }
+    draw() {
+        ctx.globalAlpha = this.opacity;
+        ctx.drawImage(sprite, SPRITES.CLOUD.x, SPRITES.CLOUD.y, SPRITES.CLOUD.w, SPRITES.CLOUD.h, this.x, this.y, SPRITES.CLOUD.w, SPRITES.CLOUD.h);
+        ctx.globalAlpha = 1;
+    }
+}
+
+// --- Skull obstacle (Devil World only) ---
+class Skull {
+    constructor() {
+        this.width = 28;
+        this.height = 26;
+        this.x = canvas.width;
+        this.isFlipped = gravityFlipped;
+        this.y = this.isFlipped ? ceilingYPosition : groundYPosition - this.height;
+        this.passed = false;
+        this.frame = 0;
+        // stacking parameters
+        this.stackIndex = 0; // 0 means base
+        this.stackHeight = 1;
+    }
+    update() {
+        this.x -= gameSpeed;
+        this.frame++;
+    }
+    draw() {
+        const x = this.x;
+        const y = this.y;
+        // Draw a simple skull icon with canvas primitives
+        const drawOne = (offsetY) => {
+          ctx.save();
+          const baseY = this.isFlipped ? (y - offsetY) : (y - offsetY);
+          if (this.isFlipped) {
+              ctx.translate(x + this.width/2, baseY + this.height/2);
+              ctx.rotate(Math.PI);
+              ctx.translate(-this.width/2, -this.height/2);
+          } else {
+              ctx.translate(x, baseY);
+          }
+          // skull base
+          ctx.fillStyle = '#f1f1f1';
+          ctx.strokeStyle = '#333';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(4, 10);
+          ctx.quadraticCurveTo(2, 2, 14, 2);
+          ctx.quadraticCurveTo(26, 2, 24, 10);
+          ctx.lineTo(24, 18);
+          ctx.quadraticCurveTo(20, 24, 8, 24);
+          ctx.lineTo(4, 18);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          // eyes
+          ctx.fillStyle = '#000';
+          const blink = (Math.floor(this.frame/40)%6===0) ? 0.2 : 1;
+          ctx.globalAlpha = blink;
+          ctx.beginPath(); ctx.arc(9, 11, 3, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(19, 11, 3, 0, Math.PI*2); ctx.fill();
+          ctx.globalAlpha = 1;
+          // nose
+          ctx.fillStyle = '#222';
+          ctx.beginPath(); ctx.moveTo(14, 14); ctx.lineTo(12, 18); ctx.lineTo(16, 18); ctx.closePath(); ctx.fill();
+          // teeth
+          ctx.fillStyle = '#e6e6e6';
+          for (let i=0;i<4;i++) ctx.fillRect(8+i*3, 20, 2, 4);
+          ctx.restore();
+        };
+        // draw stacked skulls
+        for (let i = 0; i < this.stackHeight; i++) {
+          drawOne(i * (this.height - 4));
+        }
+        // ground shadow if not flipped
+        if (!this.isFlipped) {
+            ctx.fillStyle = 'rgba(83,83,83,0.25)';
+            ctx.fillRect(this.x+2, this.y+this.height-2, this.width-4, 3);
+        }
+    }
+}
+
+// --- Portal ---
+class Portal {
+    constructor() {
+        this.width = 24;
+        this.height = 50;
+        this.x = canvas.width;
+        this.isFlipped = gravityFlipped;
+        this.y = this.isFlipped ? ceilingYPosition - 2 : groundYPosition - this.height;
+        this.frame = 0;
+        this.hue = 350; // red/purple
+    }
+    update() {
+        this.x -= gameSpeed;
+        this.frame++;
+    }
+    draw() {
+        // swirling vertical portal
+        const cx = this.x + this.width/2;
+        const top = this.y + (this.isFlipped ? this.height : 0);
+        const bottom = this.y + (this.isFlipped ? 0 : this.height);
+        const swirl = 6 + 3 * Math.sin(this.frame * 0.2);
+        ctx.save();
+        ctx.strokeStyle = `hsla(${this.hue}, 90%, 55%, 0.9)`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 6; i++) {
+            const phase = (this.frame * 0.15) + i * 0.8;
+            ctx.beginPath();
+            ctx.moveTo(cx - swirl, top);
+            ctx.bezierCurveTo(
+                cx - swirl*1.2, (top+bottom)/2 + Math.sin(phase)*12,
+                cx + swirl*1.2, (top+bottom)/2 - Math.cos(phase)*12,
+                cx + swirl, bottom
+            );
+            ctx.stroke();
+        }
+        // glow
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `radial-gradient(circle, rgba(255,0,60,0.8), rgba(0,0,0,0))`;
+        ctx.restore();
+        // simple bounding box visualization edge
+        ctx.save();
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = `rgba(255,0,60,0.3)`;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+function drawGround() {
+  // Add slight ground texture variation
+  ctx.fillStyle = '#535353';
+  if (!devilWorldActive) {
+    ctx.fillRect(0, groundYPosition + 2, canvas.width, 1);
+  } else {
+    // cracked ground line
+    ctx.strokeStyle = '#3b0000';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= canvas.width; x += 12) {
+      const jitter = Math.sin((x + frame) * 0.03) * 2;
+      ctx.moveTo(x, groundYPosition + 2 + jitter);
+      ctx.lineTo(x + 6, groundYPosition + 2 - jitter);
+    }
+    ctx.stroke();
+  }
+  
+  // Apply deformation during transition
+  ctx.save();
+  if (isTransitioning) {
+    const waveHeight = mapDeformation * 8;
+    ctx.transform(1, 0, Math.sin(transitionPhase * Math.PI * 4) * 0.1, 1, 0, waveHeight * Math.sin(transitionPhase * Math.PI * 2));
+  }
+  
+  ctx.drawImage(sprite, SPRITES.GROUND.x, SPRITES.GROUND.y, SPRITES.GROUND.w, SPRITES.GROUND.h, groundX, groundYPosition-10, SPRITES.GROUND.w, SPRITES.GROUND.h);
+  ctx.drawImage(sprite, SPRITES.GROUND.x, SPRITES.GROUND.y, SPRITES.GROUND.w, SPRITES.GROUND.h, groundX + SPRITES.GROUND.w, groundYPosition-10, SPRITES.GROUND.w, SPRITES.GROUND.h);
+  ctx.restore();
+}
+
+function drawCeiling() {
+  // Add ceiling texture line
+  if (!devilWorldActive) {
+    ctx.fillStyle = '#535353';
+    ctx.fillRect(0, ceilingYPosition - 3, canvas.width, 1);
+  } else {
+    ctx.strokeStyle = '#3b0000';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= canvas.width; x += 12) {
+      const jitter = Math.cos((x + frame) * 0.03) * 2;
+      ctx.moveTo(x, ceilingYPosition - 3 + jitter);
+      ctx.lineTo(x + 6, ceilingYPosition - 3 - jitter);
+    }
+    ctx.stroke();
+  }
+  
+  ctx.save();
+  ctx.translate(canvas.width / 2, ceilingYPosition / 2);
+  ctx.rotate(Math.PI);
+  ctx.translate(-canvas.width / 2, -ceilingYPosition / 2);
+  
+  // Apply deformation during transition (opposite of ground)
+  if (isTransitioning) {
+    const waveHeight = mapDeformation * 8;
+    ctx.transform(1, 0, -Math.sin(transitionPhase * Math.PI * 4) * 0.1, 1, 0, -waveHeight * Math.sin(transitionPhase * Math.PI * 2));
+  }
+  
+  ctx.drawImage(sprite, SPRITES.GROUND.x, SPRITES.GROUND.y, SPRITES.GROUND.w, SPRITES.GROUND.h, groundX, -12, SPRITES.GROUND.w, SPRITES.GROUND.h);
+  ctx.drawImage(sprite, SPRITES.GROUND.x, SPRITES.GROUND.y, SPRITES.GROUND.w, SPRITES.GROUND.h, groundX + SPRITES.GROUND.w, -12, SPRITES.GROUND.w, SPRITES.GROUND.h);
+  ctx.restore();
+}
+
+
+function drawDino() {
+  let currentSprite;
+  if (!dino.onGround) {
+    currentSprite = SPRITES.DINO_JUMP;
+  } else if (dino.isDucking) {
+    currentSprite = (Math.floor(frame / 6) % 2 === 0)
+      ? SPRITES.DINO_DUCK1
+      : SPRITES.DINO_DUCK2;
+  } else {
+    currentSprite = (Math.floor(frame / 8) % 2 === 0)
+      ? SPRITES.DINO_RUN1
+      : SPRITES.DINO_RUN2;
+  }
+
+  ctx.save();
+
+  // Use sprite dimensions from SPRITES object
+  let srcW = currentSprite.w;
+  let srcH = currentSprite.h;
+  const destW = dino.width;
+  const destH = dino.height;
+
+  // Ensure source rect is within the sprite image bounds to avoid blank draws
+  let sx = currentSprite.x;
+  let sy = currentSprite.y;
+  const imgW = sprite.width || sprite.naturalWidth || 0;
+  const imgH = sprite.height || sprite.naturalHeight || 0;
+  if (imgW && (sx + srcW > imgW)) {
+    // If ducking frame exceeds sheet width, fallback to a safe duck frame
+    if (dino.isDucking) {
+      sx = SPRITES.DINO_DUCK1.x;
+      sy = SPRITES.DINO_DUCK1.y;
+      srcW = SPRITES.DINO_DUCK1.w;
+      srcH = SPRITES.DINO_DUCK1.h;
+    } else {
+      srcW = Math.max(0, imgW - sx);
+    }
+  }
+  if (imgH && (sy + srcH > imgH)) {
+    srcH = Math.max(0, imgH - sy);
+  }
+
+  // draw shadow when not flipped
+  if (!isTransitioning && !gravityFlipped) {
+    ctx.fillStyle = 'rgba(83, 83, 83, 0.2)';
+    ctx.fillRect(
+      dino.x + 4,
+      dino.y + dino.height - 2,
+      dino.width - 8,
+      3
+    );
+  }
+
+  if (gravityFlipped) {
+    // flip upright/backwards and add tumble spin during transition
+    ctx.translate(dino.x + dino.width / 2, dino.y + dino.height / 2);
+    let spin = 0;
+    if (isTransitioning) {
+      // extra spin while flipping
+      spin = (transitionPhase * Math.PI * 1.5) * (Math.random() > 0.5 ? 1 : -1);
+    }
+    ctx.rotate(Math.PI + spin);
+    ctx.drawImage(sprite, sx, sy, srcW, srcH, -destW / 2, -destH / 2, destW, destH);
+  } else {
+    ctx.save();
+    if (isTransitioning) {
+      const spin = (transitionPhase * Math.PI * 1.5) * (Math.random() > 0.5 ? 1 : -1);
+      ctx.translate(dino.x + dino.width / 2, dino.y + dino.height / 2);
+      ctx.rotate(spin);
+      ctx.drawImage(sprite, sx, sy, srcW, srcH, -destW / 2, -destH / 2, destW, destH);
+    } else {
+      ctx.drawImage(sprite, sx, sy, srcW, srcH, dino.x, dino.y, destW, destH);
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+
+
+
+function updateDino() {
+  if (isTransitioning) {
+    // During transition, dino levitates in the middle
+    const centerY = (groundYPosition + ceilingYPosition) / 2 - dino.height / 2;
+    dino.y = centerY + dinoLevitationHeight;
+    dino.velocityY = 0;
+    return;
+  }
+  
+  if (!dino.onGround) {
+    const gravityEffect = gravityFlipped ? -dino.gravity : dino.gravity;
+    dino.velocityY += gravityEffect;
+    dino.y += dino.velocityY;
+    
+    // Add velocity limits for better control
+    const maxVelocity = 12;
+    dino.velocityY = Math.max(-maxVelocity, Math.min(maxVelocity, dino.velocityY));
+  }
+
+  const groundLevel = getGroundLevel();
+  if ((!gravityFlipped && dino.y >= groundLevel) || (gravityFlipped && dino.y <= groundLevel)) {
+    dino.y = groundLevel;
+    dino.velocityY = 0;
+    dino.onGround = true;
+  }
+  
+  // Prevent dino from going out of bounds
+  dino.y = Math.max(0, Math.min(canvas.height - dino.height, dino.y));
+}
+
+function jump() {
+  if (gameRunning && dino.onGround && !isTransitioning && !dino.isDucking) {
+    // Add subtle jump sound effect simulation with canvas flash
+    canvas.style.filter = 'brightness(1.1)';
+    setTimeout(() => { canvas.style.filter = 'brightness(1)'; }, 100);
+    
+    dino.velocityY = gravityFlipped ? dino.jumpPower : -dino.jumpPower;
+    dino.onGround = false;
+  }
+}
+
+function duck() {
+  if (gameRunning && dino.onGround && !isTransitioning) {
+    if (!dino.isDucking) {
+      dino.isDucking = true;
+      dino.width = dino.duckWidth;
+      dino.height = dino.duckHeight;
+      dino.y = getGroundLevel();
+    }
+  }
+}
+
+function stopDuck() {
+  if (dino.isDucking) {
+    dino.isDucking = false;
+    dino.width = dino.normalWidth;
+    dino.height = dino.normalHeight;
+    dino.y = getGroundLevel();
+  }
+}
+
+function flipGravity() {
+  if (isTransitioning) return; // Prevent multiple flips during transition
+  
+  isTransitioning = true;
+  transitionStartTime = performance.now();
+  transitionPhase = 0;
+  
+  // Start the dramatic transition
+  canvas.style.filter = 'brightness(1.5) contrast(1.3) saturate(2)';
+  
+  // Freeze dino in air if on ground
+  if (dino.onGround) {
+    dino.onGround = false;
+    dino.velocityY = 0; // Stop all movement during transition
+  }
+  
+  gravityTimer = 8;
+  lastFlipTime = performance.now();
+}
+
+function updateGravityTimer() {
+    if (!gameRunning) return;
+    
+    if (isTransitioning) {
+        gravityTimerEl.textContent = 'GRAVITY FLIPPING...';
+        gravityTimerEl.style.color = '#ff6b35';
+        gravityTimerEl.style.fontWeight = 'bold';
+        return;
+    }
+    
+    const elapsed = (performance.now() - lastFlipTime) / 1000;
+    gravityTimer = Math.max(0, 8 - elapsed);
+    gravityTimerEl.textContent = `GRAVITY FLIP: ${Math.ceil(gravityTimer)}s`;
+    gravityTimerEl.classList.toggle('warning', gravityTimer <= 5 && gravityTimer > 0);
+    gravityTimerEl.classList.toggle('flipped', gravityFlipped);
+    
+    // Reset color after transition
+    gravityTimerEl.style.color = '';
+    
+    // Add countdown urgency with different warning levels
+    if (gravityTimer <= 2 && gravityTimer > 0) {
+        gravityTimerEl.style.fontSize = '13px';
+        gravityTimerEl.style.fontWeight = 'bold';
+    } else {
+        gravityTimerEl.style.fontSize = '11px';
+        gravityTimerEl.style.fontWeight = 'normal';
+    }
+    if (gravityTimer <= 0) {
+        flipGravity();
+    }
+}
+
+function checkCollision() {
+  for (let i = 0; i < obstacles.length; i++) {
+    const o = obstacles[i];
+    const dinoRect = { x: dino.x + 6, y: dino.y + 6, width: dino.width - 12, height: dino.height - 12 };
+    const obstacleRect = { x: o.x + 2, y: o.y + 2, width: o.width - 4, height: o.height - 4 };
+    const intersects = (
+      dinoRect.x < obstacleRect.x + obstacleRect.width &&
+      dinoRect.x + dinoRect.width > obstacleRect.x &&
+      dinoRect.y < obstacleRect.y + obstacleRect.height &&
+      dinoRect.y + dinoRect.height > obstacleRect.y
+    );
+    if (!intersects) continue;
+    if (o.type === 'orb') {
+      triggerInkEffect();
+      obstacles.splice(i, 1);
+      i--;
+      continue;
+    }
+    return true;
+  }
+  // check portals separately (non-lethal)
+  for (let i = 0; i < portals.length; i++) {
+    const p = portals[i];
+    const dinoRect = { x: dino.x + 6, y: dino.y + 6, width: dino.width - 12, height: dino.height - 12 };
+    const portalRect = { x: p.x, y: p.y, width: p.width, height: p.height };
+    const intersects = (
+      dinoRect.x < portalRect.x + portalRect.width &&
+      dinoRect.x + dinoRect.width > portalRect.x &&
+      dinoRect.y < portalRect.y + portalRect.height &&
+      dinoRect.y + dinoRect.height > portalRect.y
+    );
+    if (intersects) {
+      enterDevilWorld();
+      portals.splice(i, 1);
+      i--;
+    }
+  }
+  return false;
+}
+
+let nextObstacleFrame = 100;
+function manageObstacles() {
+    if (!devilWorldActive && frame > nextObstacleFrame) {
+        obstacles.push(new Obstacle());
+        nextObstacleFrame = frame + 80 + Math.floor(Math.random() * (1100 / gameSpeed));
+    }
+    // During devil world, spawn skulls instead of normal obstacles
+    if (devilWorldActive && frame >= nextDevilSkullFrame) {
+        const base = new Skull();
+        // Randomly create stacks: 60% single, 30% double, 10% triple
+        const roll = Math.random();
+        let count = roll < 0.1 ? 3 : roll < 0.4 ? 2 : 1;
+        base.stackHeight = count;
+        obstacles.push(base);
+        // schedule next pack sooner for intensity
+        nextDevilSkullFrame = frame + Math.floor(60 + Math.random()*50);
+    }
+    obstacles.forEach((o, i) => {
+        o.update();
+        o.draw();
+        
+        // Add score increment when passing obstacles
+        if (!o.passed && o.x + o.width < dino.x) {
+            o.passed = true;
+            score += 5; // Bonus points for successful dodge
+        }
+        
+        if (o.x + o.width < 0) {
+            obstacles.splice(i, 1);
+        }
+    });
+}
+
+// --- Portals management ---
+let portals = [];
+function managePortals() {
+    // Spawn a portal occasionally when not active
+    if (!devilWorldActive && frame > nextPortalFrame) {
+        portals.push(new Portal());
+        // next portal spawns much later
+        nextPortalFrame = frame + 1200 + Math.floor(Math.random() * 900);
+    }
+    portals.forEach((p, i) => {
+        p.update();
+        p.draw();
+        if (p.x + p.width < 0) portals.splice(i, 1);
+    });
+}
+
+let nextCloudFrame = 150;
+function manageClouds() {
+    if (frame > nextCloudFrame) {
+        clouds.push(new Cloud());
+        nextCloudFrame = frame + 300 + Math.random() * 400;
+    }
+    clouds.forEach((c, i) => {
+        c.update();
+        c.draw();
+        if (c.x + SPRITES.CLOUD.w < 0) {
+            clouds.splice(i, 1);
+        }
+    });
+}
+
+function updateScore() {
+    score += 0.05;
+    scoreEl.textContent = String(Math.floor(score)).padStart(5, '0');
+}
+
+function handleGameOver() {
+    gameRunning = false;
+    gameOverState = true;
+    
+    // Add shake effect and screen flash for collision feedback
+    canvas.style.animation = 'shake 0.5s';
+    canvas.style.filter = 'brightness(1.5) contrast(1.2)';
+    setTimeout(() => { 
+        canvas.style.animation = ''; 
+        canvas.style.filter = 'brightness(1) contrast(1)';
+    }, 500);
+    
+    // Check if it's a new high score and handle leaderboard
+    const finalScore = Math.floor(score);
+    if (finalScore > highScore) {
+        highScore = finalScore;
+        localStorage.setItem('dinoHighScore', highScore);
+        highScoreEl.textContent = `HI ${String(Math.floor(highScore)).padStart(5, '0')}`;
+        
+        // Check if this score makes it to the leaderboard
+        if (shouldAddToLeaderboard(finalScore)) {
+            if (!currentPlayerName) {
+                // First time player or no name set
+                waitingForNameInput = true;
+                nameInputEl.style.display = 'block';
+                playerNameInput.focus();
+                return; // Don't show game over screen yet
+            } else {
+                // Update existing player's score
+                updateLeaderboard(currentPlayerName, finalScore);
+            }
+        }
+    }
+    
+    showGameOverScreen();
+}
+
+function showGameOverScreen() {
+    // Don't clear the canvas or regenerate obstacles - keep current state frozen
+    gameOverScreen.style.display = 'flex';
+    
+    // Draw "Game Over" text and restart button on canvas
+    const go = SPRITES.GAME_OVER_TEXT;
+    ctx.drawImage(sprite, go.x, go.y, go.w, go.h, canvas.width/2 - go.w/2, 50, go.w, go.h);
+    const re = SPRITES.RESTART_BTN;
+    ctx.drawImage(sprite, re.x, re.y, re.w, re.h, canvas.width/2 - re.w/2, 80, re.w, re.h);
+}
+
+function updateTransition() {
+  if (!isTransitioning) return;
+  
+  const elapsed = performance.now() - transitionStartTime;
+  transitionPhase = Math.min(elapsed / TRANSITION_DURATION, 1);
+  
+  // Easing function for smooth animation
+  const easedPhase = 0.5 - 0.5 * Math.cos(transitionPhase * Math.PI);
+  
+  // Update map deformation (peaks at middle of transition)
+  mapDeformation = Math.sin(transitionPhase * Math.PI);
+  
+  // Update dino levitation (floating effect)
+  dinoLevitationHeight = Math.sin(transitionPhase * Math.PI * 6) * 10 * mapDeformation;
+  
+  // Add tumble (multi-axis) and vignette during flip
+  const maxTilt = 22; // degrees
+  const direction = gravityFlipped ? -1 : 1;
+  const tiltX = direction * (Math.sin(transitionPhase * Math.PI) * maxTilt);
+  const tiltZ = direction * (Math.cos(transitionPhase * Math.PI) * (maxTilt * 0.6));
+  canvas.style.transform = `perspective(700px) rotateX(${tiltX}deg) rotateZ(${tiltZ}deg)`;
+  const vignette = Math.floor(8 + 12 * Math.sin(transitionPhase * Math.PI));
+  canvas.style.boxShadow = `inset 0 0 ${vignette}px rgba(0,0,0,0.4)`;
+
+  // Afterimages trail for the dino
+  const trailCount = 5;
+  const trailOpacity = Math.sin(transitionPhase * Math.PI) * 0.6;
+  if (trailOpacity > 0.02) {
+    ctx.save();
+    ctx.globalAlpha = trailOpacity / trailCount;
+    for (let t = 1; t <= trailCount; t++) {
+      const offset = t * 4 * (gravityFlipped ? -1 : 1);
+      ctx.translate(0, offset);
+      drawDino();
+    }
+    ctx.restore();
+  }
+
+  // Complete the transition
+  if (transitionPhase >= 1) {
+    // Flip gravity at the end
+    gravityFlipped = !gravityFlipped;
+    
+    // Reset transition state
+    isTransitioning = false;
+    transitionPhase = 0;
+    mapDeformation = 0;
+    dinoLevitationHeight = 0;
+    
+    // Reset visual effects
+    canvas.style.filter = gravityFlipped ? 'saturate(1.1)' : 'saturate(1)';
+    canvas.style.transform = 'rotate(0deg)';
+    canvas.style.boxShadow = '';
+    
+    // Position dino on the correct surface
+    resetDino();
+  }
+}
+
+function gameLoop(timestamp) {
+  if (!gameRunning) return;
+  frame++;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Update transition state
+  updateTransition();
+  
+  // Dramatic background effects during transition
+  if (isTransitioning) {
+    // Pulsing energy field effect
+    const intensity = Math.sin(transitionPhase * Math.PI * 8) * 0.3 + 0.7;
+    ctx.fillStyle = `rgba(${gravityFlipped ? '138, 79, 202' : '255, 107, 53'}, ${0.2 * intensity})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Energy particle effects
+    for (let i = 0; i < 20; i++) {
+      const x = Math.random() * canvas.width;
+      const y = Math.random() * canvas.height;
+      const size = Math.random() * 3 + 1;
+      const opacity = Math.sin(transitionPhase * Math.PI) * Math.random();
+      ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+      ctx.fillRect(x, y, size, size);
+    }
+  } else {
+    // Normal gameplay speed increase
+    if (gameSpeed < 5) {
+      gameSpeed += 0.001;
+    }
+    
+    // World tinting
+    if (devilWorldActive) {
+      // deep red fog + floating embers
+      devilFogPhase += 0.005;
+      const fog1 = Math.sin(devilFogPhase) * 10;
+      const fog2 = Math.cos(devilFogPhase * 0.6) * 10;
+      ctx.fillStyle = 'rgba(120, 0, 0, 0.25)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(180, 0, 0, 0.18)';
+      ctx.fillRect(fog1, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(90, 0, 0, 0.22)';
+      ctx.fillRect(0, fog2, canvas.width, canvas.height);
+      updateEmbers();
+      drawEmbers();
+    } else if (gravityFlipped) {
+      ctx.fillStyle = 'rgba(128, 0, 128, 0.15)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  // Apply ink effect overlay
+  updateInkEffect();
+
+  // Only move ground during normal gameplay
+  if (!isTransitioning) {
+    groundX -= gameSpeed;
+    if (groundX <= -SPRITES.GROUND.w) {
+      groundX = 0;
+    }
+  }
+
+  drawGround();
+  drawCeiling();
+  if (!isTransitioning) manageClouds(); // Pause clouds during transition
+  if (!isTransitioning) managePortals();
+  updateDino();
+  drawDino();
+  if (!isTransitioning) manageObstacles(); // Pause obstacles during transition
+  if (!isTransitioning) updateScore(); // Pause scoring during transition
+  updateGravityTimer();
+  updateDevilWorld();
+
+  if (!isTransitioning && checkCollision()) {
+      handleGameOver();
+      return;
+  }
+  if (gameRunning) {
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+function startGame() {
+    if (gameOverState) return;
+    startScreen.style.display = 'none';
+    gameRunning = true;
+    lastFlipTime = performance.now();
+    
+    // Add smooth start transition
+    canvas.style.filter = 'brightness(1.2)';
+    setTimeout(() => { canvas.style.filter = 'brightness(1)'; }, 200);
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function restartGame() {
+    if (waitingForNameInput) return; // Don't restart while waiting for name
+    
+    gameOverState = false;
+    gameOverScreen.style.display = 'none';
+    waitingForNameInput = false;
+    score = 0;
+    gameSpeed = 2.5;
+    gravityFlipped = false;
+    gravityTimer = 8;
+    frame = 0;
+    
+    // Reset transition state
+    isTransitioning = false;
+    transitionStartTime = 0;
+    transitionPhase = 0;
+    mapDeformation = 0;
+    dinoLevitationHeight = 0;
+    
+    obstacles = [];
+    clouds = [];
+    groundX = 0;
+    nextObstacleFrame = 100;
+    nextCloudFrame = 150;
+    portals = [];
+    nextPortalFrame = frame + 400;
+    devilWorldActive = false;
+    devilWorldEndTime = 0;
+    devilTimerEl.style.display = 'none';
+    // reset ink
+    clearInkOverlay();
+    inkEffectActive = false;
+    inkEffectEndTime = 0;
+    inkHalfClass = 'half-right';
+    lastInkPulse = 0;
+    resetDino();
+    startGame();
+}
+
+function handleInput(e) {
+    // Don't handle game inputs when waiting for name input
+    if (waitingForNameInput) return;
+    
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.type === 'touchstart') {
+        e.preventDefault();
+        if (gameOverState && !waitingForNameInput) {
+            restartGame();
+        } else if (!gameRunning) {
+            startGame();
+        } else {
+            jump();
+        }
+    }
+    
+    // Duck with down arrow
+    if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        if (gameRunning) {
+            duck();
+        }
+    }
+    
+    // Add pause functionality
+    if (e.code === 'KeyP' && gameRunning && !gameOverState) {
+        gameRunning = false;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '20px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('PAUSED', canvas.width/2, canvas.height/2);
+        ctx.fillText('Press P to resume', canvas.width/2, canvas.height/2 + 30);
+        ctx.textAlign = 'left';
+    } else if (e.code === 'KeyP' && !gameRunning && !gameOverState) {
+        gameRunning = true;
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+function handleKeyUp(e) {
+    // Stop ducking when down arrow is released
+    if (e.code === 'ArrowDown') {
+        stopDuck();
+    }
+}
+
+document.addEventListener('keydown', handleInput);
+document.addEventListener('keyup', handleKeyUp);
+document.addEventListener('touchstart', handleInput);
+canvas.addEventListener('click', () => {
+    if (gameRunning) jump();
+    else if (gameOverState && !waitingForNameInput) restartGame();
+    else if (!gameRunning && !gameOverState) startGame();
+});
+
+// --- Leaderboard Functions ---
+function getLeaderboard() {
+    const saved = localStorage.getItem('dinoLeaderboard');
+    return saved ? JSON.parse(saved) : [];
+}
+
+function saveLeaderboard(leaderboard) {
+    localStorage.setItem('dinoLeaderboard', JSON.stringify(leaderboard));
+}
+
+function shouldAddToLeaderboard(score) {
+    const leaderboard = getLeaderboard();
+    return leaderboard.length < 10 || score > leaderboard[leaderboard.length - 1].score;
+}
+
+function updateLeaderboard(name, score) {
+    let leaderboard = getLeaderboard();
+    
+    // Remove existing entry for this player
+    leaderboard = leaderboard.filter(entry => entry.name.toLowerCase() !== name.toLowerCase());
+    
+    // Add new score
+    leaderboard.push({ name: name.trim(), score: score });
+    
+    // Sort by score (descending) and keep top 10
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard = leaderboard.slice(0, 10);
+    
+    saveLeaderboard(leaderboard);
+    displayLeaderboard();
+}
+
+function displayLeaderboard() {
+    const leaderboard = getLeaderboard();
+    leaderboardListEl.innerHTML = '';
+    
+    if (leaderboard.length === 0) {
+        leaderboardListEl.innerHTML = '<div style="text-align: center; color: #888;">No scores yet</div>';
+        return;
+    }
+    
+    leaderboard.forEach((entry, index) => {
+        const div = document.createElement('div');
+        div.className = 'leaderboard-entry';
+        if (entry.name.toLowerCase() === currentPlayerName.toLowerCase()) {
+            div.classList.add('current-user');
+        }
+        
+        const rank = index + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+        
+        div.innerHTML = `
+            <span>${medal} ${entry.name}</span>
+            <span>${entry.score}</span>
+        `;
+        leaderboardListEl.appendChild(div);
+    });
+}
+
+function submitScore() {
+    const name = playerNameInput.value.trim();
+    if (!name) {
+        alert('Please enter your name!');
+        return;
+    }
+    
+    if (name.length > 12) {
+        alert('Name too long! Maximum 12 characters.');
+        return;
+    }
+    
+    currentPlayerName = name;
+    localStorage.setItem('playerName', name);
+    
+    const finalScore = Math.floor(score);
+    updateLeaderboard(name, finalScore);
+    
+    nameInputEl.style.display = 'none';
+    waitingForNameInput = false;
+    showGameOverScreen();
+}
+
+// Handle Enter key in name input
+playerNameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        submitScore();
+    }
+});
+
+// --- Leaderboard Modal Functions ---
+function showLeaderboard() {
+    displayLeaderboard();
+    leaderboardModal.style.display = 'flex';
+}
+
+function hideLeaderboard() {
+    leaderboardModal.style.display = 'none';
+}
+
+// Close leaderboard when clicking outside
+leaderboardModal.addEventListener('click', (e) => {
+    if (e.target === leaderboardModal) {
+        hideLeaderboard();
+    }
+});
+
+// Initialize leaderboard display
+displayLeaderboard();
+
+// --- Ink/Squid effect helpers ---
+function clearInkOverlay() {
+  inkOverlay.className = '';
+  inkOverlay.style.opacity = '0';
+  inkOverlay.innerHTML = '';
+  inkOverlay.style.display = 'none';
+}
+
+function triggerInkEffect() {
+  const now = performance.now();
+  inkEffectActive = true;
+  inkEffectEndTime = now + INK_EFFECT_DURATION_MS;
+  lastInkPulse = 0;
+
+  inkOverlay.className = 'active';
+  inkOverlay.style.display = 'block';
+
+  // initial splats
+  spawnInkSplats(12, true);
+}
+
+function spawnInkSplats(count, big = false) {
+  const rect = canvas.getBoundingClientRect();
+  for (let i = 0; i < count; i++) {
+    const s = document.createElement('div');
+    s.className = 'ink-splat';
+    const size = big ? (40 + Math.random() * 95) : (18 + Math.random() * 36);
+    s.style.width = `${size}px`;
+    s.style.height = `${size}px`;
+    s.style.left = `${Math.random() * rect.width}px`;
+    s.style.top = `${Math.random() * rect.height}px`;
+    s.style.transform = `scale(${0.8 + Math.random()*1.1}) rotate(${Math.random()*360-180}deg)`;
+    inkOverlay.appendChild(s);
+    // append small dots around to make it blobby
+    const dotCount = 3 + Math.floor(Math.random()*5);
+    for (let d = 0; d < dotCount; d++) {
+      const dot = document.createElement('div');
+      dot.className = 'ink-dot';
+      const dr = (size * 0.12) + Math.random() * (size * 0.35);
+      const angle = Math.random() * Math.PI * 2;
+      const dx = Math.cos(angle) * (size * 0.4 + Math.random()*size*0.35);
+      const dy = Math.sin(angle) * (size * 0.4 + Math.random()*size*0.35);
+      dot.style.width = `${dr}px`;
+      dot.style.height = `${dr}px`;
+      dot.style.left = `calc(${s.style.left} + ${dx}px)`;
+      dot.style.top = `calc(${s.style.top} + ${dy}px)`;
+      dot.style.opacity = String(0.85 + Math.random()*0.15);
+      inkOverlay.appendChild(dot);
+      setTimeout(() => {
+        dot.style.transition = 'opacity 700ms ease';
+        dot.style.opacity = '0';
+        setTimeout(() => dot.remove(), 800);
+      }, 2600 + Math.random()*1200);
+    }
+    // auto fade out late
+    setTimeout(() => {
+      s.style.transition = 'opacity 600ms ease, transform 600ms ease';
+      s.style.opacity = '0';
+      s.style.transform += ' scale(0.8)';
+      setTimeout(() => s.remove(), 800);
+    }, 2600 + Math.random()*1200);
+  }
+}
+
+function updateInkEffect() {
+  if (!inkEffectActive) return;
+  const now = performance.now();
+  const remaining = Math.max(0, inkEffectEndTime - now);
+  const progress = 1 - remaining / INK_EFFECT_DURATION_MS; // 0 -> 1
+
+  // breathe opacity
+  const base = 0.75; // darker like the reference
+  const pulse = 0.08 * Math.sin(now * 0.008);
+  const fade = (remaining < 700) ? remaining / 700 : 1;
+  inkOverlay.style.opacity = String(Math.max(0, (base + pulse) * fade));
+
+  // periodic extra splats
+  if (now - lastInkPulse > 450) {
+    lastInkPulse = now;
+    spawnInkSplats(3);
+  }
+
+  if (remaining <= 0) {
+    inkEffectActive = false;
+    clearInkOverlay();
+  }
+}
+
+// --- Devil World helpers ---
+function enterDevilWorld() {
+  devilWorldActive = true;
+  devilWorldEndTime = performance.now() + DEVIL_WORLD_DURATION_MS;
+  // nuke current obstacles
+  obstacles = [];
+  // save and boost speed significantly for challenge
+  savedSpeedBeforeDevil = gameSpeed;
+  gameSpeed = Math.min(7.5, Math.max(gameSpeed, 5.5));
+  nextDevilSkullFrame = frame + 30;
+  // strong red flash
+  canvas.style.filter = 'brightness(1.3) contrast(1.2) saturate(1.4)';
+  setTimeout(() => { canvas.style.filter = 'none'; }, 250);
+  // show timer UI
+  devilTimerEl.style.display = 'block';
+}
+
+function updateDevilWorld() {
+  if (!devilWorldActive) return;
+  const remainingMs = devilWorldEndTime - performance.now();
+  const remaining = Math.max(0, Math.ceil(remainingMs / 1000));
+  devilTimerEl.textContent = `DEVIL WORLD: ${remaining}s`;
+  // block obstacles while active
+  if (remainingMs <= 0) {
+    devilWorldActive = false;
+    devilTimerEl.style.display = 'none';
+    // clean up skulls quickly
+    obstacles = obstacles.filter(o => !(o instanceof Skull));
+    // restore speed smoothly
+    gameSpeed = Math.max(2.5, savedSpeedBeforeDevil);
+  }
+}
+
+// --- Devil World ambient embers ---
+function updateEmbers() {
+  // add embers up to a cap
+  if (embers.length < 30 && Math.random() < 0.4) {
+    embers.push({
+      x: Math.random() * canvas.width,
+      y: groundYPosition - Math.random()*60,
+      vy: -0.3 - Math.random()*0.4,
+      vx: (Math.random()-0.5) * 0.3,
+      life: 120 + Math.random()*120,
+      size: 1 + Math.random()*2,
+      hue: 8 + Math.random()*24
+    });
+  }
+  embers.forEach((e, i) => {
+    e.x += e.vx; e.y += e.vy; e.life -= 1;
+    if (e.life <= 0 || e.y < 0) embers.splice(i, 1);
+  });
+}
+
+function drawEmbers() {
+  ctx.save();
+  embers.forEach(e => {
+    const alpha = Math.max(0, Math.min(1, e.life/180));
+    ctx.fillStyle = `hsla(${10+e.hue}, 90%, ${50+Math.random()*20}%, ${0.4*alpha})`;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.size, 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+  </script>
+</body>
+</html>
