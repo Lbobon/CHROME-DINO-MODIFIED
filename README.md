@@ -9,8 +9,9 @@ This is a modified version of the classic Chrome Dino game with some exciting ne
 ### ✨ New Features
 - **Gravity Inversion Mode**: Every 8 seconds, gravity flips!
 - **Ceiling Running**: The dino clings to the "ceiling" and hurdles inverted cacti
-- **Enhanced Physics**: Completely reimagined jumping mechanics
-- **Clean Interface**: Removed unnecessary social media links
+- **Enhanced Physics**: Completely reimagined jumping mechanics, and the dino now runs on the ceiling
+- **Clean Interface**: Removed unnecessary things on the screen
+- **Invisible Mode**: When trying to bend, the dino will be invisible (just for fun, but hes actually physically there)
 
 ### 🎮 How to Play
 
